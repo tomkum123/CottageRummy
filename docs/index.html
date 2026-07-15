@@ -9,7 +9,7 @@
     body {
       font-family: Arial, sans-serif;
       margin: 25px;
-      background: #f7f9fc;
+      background: linear-gradient(135deg, #eef3ff, #ffffff);
       color: #333;
     }
 
@@ -17,19 +17,22 @@
       font-size: 28px;
       margin-bottom: 10px;
       text-align: center;
+      color: #2a3f8b;
     }
 
     .card {
-      background: white;
+      background: linear-gradient(135deg, #ffffff, #f0f4ff);
       padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       margin-bottom: 20px;
+      border-left: 5px solid #4a6cf7;
     }
 
     .card h3 {
       margin-top: 0;
       font-size: 20px;
+      color: #2a3f8b;
       border-bottom: 1px solid #ddd;
       padding-bottom: 6px;
     }
@@ -42,6 +45,7 @@
       display: inline-block;
       width: 140px;
       font-weight: bold;
+      color: #2a3f8b;
     }
 
     input[type="number"],
@@ -51,6 +55,7 @@
       width: 180px;
       border-radius: 6px;
       border: 1px solid #ccc;
+      background: #f9faff;
     }
 
     button {
@@ -60,6 +65,11 @@
       border: none;
       cursor: pointer;
       font-weight: bold;
+      transition: transform 0.1s ease;
+    }
+
+    button:hover {
+      transform: scale(1.05);
     }
 
     #saveBtn { background: #34A853; color: white; }
@@ -71,13 +81,14 @@
       font-size: 0.9em;
       font-weight: bold;
       text-align: center;
+      color: #2a3f8b;
     }
 
     .last-entry {
-      background: #f9fafc;
+      background: #eef3ff;
       padding: 12px;
       border-radius: 8px;
-      border: 1px solid #ddd;
+      border-left: 4px solid #4285F4;
       margin-top: 10px;
     }
 
@@ -86,27 +97,25 @@
       font-size: 14px;
     }
 
-    /* MOBILE COMPACT */
     @media (max-width: 700px) {
       label {
         width: 100%;
         margin-bottom: 6px;
       }
-
       .input-row {
         display: block;
       }
-
       input {
         width: 100%;
       }
-
       button {
         width: 100%;
         margin-bottom: 10px;
       }
     }
   </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -151,7 +160,7 @@
 const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
 const repoOwner = "tomkum123";
 const repoName = "CottageRummy";
-const filePath = "docs/Cottage Rummy Data File.csv";
+const filePath = "docs/Cottage Rummy Data File.xlsx";
 
 let localEntries = JSON.parse(localStorage.getItem("rummyEntries") || "[]");
 
@@ -171,10 +180,6 @@ players.forEach(p => {
 function normalizeDate(dateStr) {
   if (!dateStr) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    const [m, d, y] = dateStr.split("/");
-    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  }
   const dt = new Date(dateStr);
   if (!isNaN(dt)) {
     const y = dt.getFullYear();
@@ -185,7 +190,7 @@ function normalizeDate(dateStr) {
   return dateStr;
 }
 
-// Load last entry
+// Load last entry from XLSX
 async function loadLastEntry() {
   const token = localStorage.getItem("githubToken");
   if (!token) {
@@ -201,23 +206,23 @@ async function loadLastEntry() {
 
   if (!res.ok) {
     document.getElementById("lastEntryBox").innerHTML =
-      "<p>Could not load CSV.</p>";
+      "<p>Could not load XLSX.</p>";
     return;
   }
 
   const meta = await res.json();
-  const csvText = atob(meta.content);
-  const lines = csvText.trim().split("\n");
 
-  const headers = lines[0].split(",");
-  const lastLine = lines[lines.length - 1].split(",");
+  // Decode XLSX
+  const binary = atob(meta.content);
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const workbook = XLSX.read(bytes, { type: "array" });
 
-  let lastEntry = {};
-  headers.forEach((h, i) => lastEntry[h] = lastLine[i]);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-  lastEntry.Date = normalizeDate(lastEntry.Date);
+  const lastEntry = rows[rows.length - 1];
 
-  let html = `<p><strong>Date:</strong> ${lastEntry.Date}</p>`;
+  let html = `<p><strong>Date:</strong> ${normalizeDate(lastEntry.Date)}</p>`;
   players.forEach(p => {
     html += `<p><strong>${p}:</strong> ${lastEntry[p] || ""}</p>`;
   });
@@ -227,14 +232,11 @@ async function loadLastEntry() {
 
 // Save token
 document.getElementById("tokenBtn").onclick = () => {
-  const input = document.getElementById("tokenInput");
-  const token = input && input.value ? input.value.trim() : "";
-
+  const token = document.getElementById("tokenInput").value.trim();
   if (!token) {
     document.getElementById("status").innerText = "Token cannot be empty.";
     return;
   }
-
   localStorage.setItem("githubToken", token);
   document.getElementById("status").innerText = "Token saved.";
   loadLastEntry();
@@ -248,7 +250,7 @@ function addLocalGame() {
     return;
   }
 
-  const row = { Date: date };
+  const row = { Date: normalizeDate(date) };
   players.forEach(p => {
     const val = document.getElementById("score_" + p).value;
     row[p] = val ? val : "";
@@ -258,7 +260,7 @@ function addLocalGame() {
   localStorage.setItem("rummyEntries", JSON.stringify(localEntries));
 }
 
-// Commit to GitHub
+// Commit XLSX to GitHub
 document.getElementById("saveBtn").onclick = async () => {
   addLocalGame();
 
@@ -268,7 +270,7 @@ document.getElementById("saveBtn").onclick = async () => {
     return;
   }
 
-  document.getElementById("status").innerText = "Loading existing CSV...";
+  document.getElementById("status").innerText = "Loading existing XLSX...";
 
   const metaRes = await fetch(
     `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
@@ -276,49 +278,34 @@ document.getElementById("saveBtn").onclick = async () => {
   );
 
   if (!metaRes.ok) {
-    document.getElementById("status").innerText = "Failed to load CSV.";
+    document.getElementById("status").innerText = "Failed to load XLSX.";
     return;
   }
 
   const meta = await metaRes.json();
-  const csvText = atob(meta.content);
-  const lines = csvText.trim().split("\n");
-  const headers = lines[0].split(",");
 
-  const existingRows = lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = cols[i]);
-    return obj;
-  });
+  // Decode XLSX
+  const binary = atob(meta.content);
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const workbook = XLSX.read(bytes, { type: "array" });
 
-  const merged = [...existingRows, ...localEntries].map(r => ({
-    Date: normalizeDate(r.Date),
-    Christine: r.Christine || "",
-    Michael: r.Michael || "",
-    Alaura: r.Alaura || "",
-    Matthew: r.Matthew || "",
-    Kirby: r.Kirby || "",
-    Annmarie: r.Annmarie || "",
-    Tom: r.Tom || ""
-  }));
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const existingRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-  const csvLines = ["Date,Christine,Michael,Alaura,Matthew,Kirby,Annmarie,Tom"];
-  merged.forEach(r => {
-    csvLines.push([
-      r.Date,
-      r.Christine,
-      r.Michael,
-      r.Alaura,
-      r.Matthew,
-      r.Kirby,
-      r.Annmarie,
-      r.Tom
-    ].join(","));
-  });
+  const merged = [...existingRows, ...localEntries];
 
-  const newCSV = csvLines.join("\n");
-  const encoded = btoa(newCSV);
+  // Convert merged rows back to XLSX
+  const newSheet = XLSX.utils.json_to_sheet(merged);
+  const newWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Sheet1");
+
+  // Generate binary XLSX
+  const xlsxBinary = XLSX.write(newWorkbook, { bookType: "xlsx", type: "binary" });
+
+  // Convert binary → base64
+  const encoded = btoa(
+    xlsxBinary.split("").map(c => String.fromCharCode(c.charCodeAt(0))).join("")
+  );
 
   const commitRes = await fetch(
     `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
@@ -329,7 +316,7 @@ document.getElementById("saveBtn").onclick = async () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        message: "Normalize dates and update Cottage Rummy Data File",
+        message: "Update XLSX with new Cottage Rummy entries",
         content: encoded,
         sha: meta.sha
       })
@@ -338,7 +325,7 @@ document.getElementById("saveBtn").onclick = async () => {
 
   if (commitRes.ok) {
     document.getElementById("status").innerText =
-      "CSV updated. Dates normalized.";
+      "XLSX updated successfully!";
     localEntries = [];
     localStorage.removeItem("rummyEntries");
     loadLastEntry();
