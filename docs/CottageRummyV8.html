@@ -5,6 +5,7 @@
   <title>Cottage Rummy Stats</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body {
@@ -149,226 +150,39 @@
 </div>
 
 <script>
-const CSV_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.csv";
+const EXCEL_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.xlsx";
 
 const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
 let results = [];
 let playerCharts = {};
 let darkMode = false;
 
-function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  const headers = lines[0].split(",");
+// ⭐ Load Excel instead of CSV
+async function loadExcel() {
+  const res = await fetch(EXCEL_URL);
+  const arrayBuffer = await res.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-  return lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = cols[i]);
-    return obj;
-  });
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
 }
 
-// Robust date parsing: supports YYYY-MM-DD and MM/DD/YYYY
-function convertToISO(dateStr) {
-  if (!dateStr) return null;
+// ⭐ FIXED: Excel-compatible date parser
+function convertToISO(dateVal) {
+  if (dateVal == null || dateVal === "") return null;
 
-  // ISO: YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    const [y, m, d] = dateStr.split("-");
-    const dt = new Date(Number(y), Number(m) - 1, Number(d));
-    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+  // 1) Excel Date object
+  if (dateVal instanceof Date) {
+    const y = dateVal.getFullYear();
+    const m = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const d = String(dateVal.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
-  // Slash: MM/DD/YYYY
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    const [m, d, y] = dateStr.split("/");
-    const dt = new Date(Number(y), Number(m) - 1, Number(d));
-    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
-  }
-
-  // Fallback
-  const d = new Date(dateStr);
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
-  return null;
-}
-
-function buildResults(rows) {
-  results = [];
-
-  rows.forEach(r => {
-    const iso = convertToISO(r["Date"]);
-    if (!iso) return;
-
-    const scores = {};
-    players.forEach(p => {
-      const val = r[p];
-      if (val && !isNaN(Number(val))) scores[p] = Number(val);
-    });
-
-    const participants = Object.keys(scores);
-    if (!participants.length) return;
-
-    const sorted = participants
-      .map(p => ({ player: p, score: scores[p] }))
-      .sort((a,b) => a.score - b.score);
-
-    const placements = {};
-    let place = 1;
-
-    for (let i = 0; i < sorted.length; ) {
-      let j = i + 1;
-      while (j < sorted.length && sorted[j].score === sorted[i].score) j++;
-      sorted.slice(i, j).forEach(s => placements[s.player] = place);
-      place += (j - i);
-      i = j;
-    }
-
-    results.push({
-      date: iso,
-      playersCount: participants.length,
-      placements
-    });
-  });
-
-  // Sort results by date ascending
-  results.sort((a, b) => new Date(a.date) - new Date(b.date));
-}
-
-function getFilteredResults() {
-  const filter = document.getElementById("playerCountFilter").value;
-  if (filter === "all") return results;
-  return results.filter(r => r.playersCount == filter);
-}
-
-function calculateStats(filtered, player) {
-  let wins = 0, total = 0, sum = 0;
-
-  filtered.forEach(g => {
-    const p = g.placements[player];
-    if (p) {
-      total++;
-      sum += p;
-      if (p === 1) wins++;
-    }
-  });
-
-  return {
-    winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
-    avgPlacement: total ? (sum / total).toFixed(2) : "-"
-  };
-}
-
-function buildPlayerCharts() {
-  const grid = document.getElementById("playerGrid");
-  grid.innerHTML = "";
-
-  players.forEach(p => {
-    const box = document.createElement("div");
-    box.className = "player-chart-box";
-    box.innerHTML = `
-      <h4>${p}</h4>
-      <div id="stats_${p}"></div>
-      <canvas id="chart_${p}"></canvas>
-    `;
-    grid.appendChild(box);
-  });
-}
-
-function updatePlayerCharts(filtered) {
-  players.forEach(p => {
-    const stats = calculateStats(filtered, p);
-
-    document.getElementById("stats_" + p).innerHTML = `
-      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.winRate}% Win Rate</span>
-      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.avgPlacement} Avg Placement</span>
-    `;
-
-    const counts = {};
-    filtered.forEach(g => {
-      const place = g.placements[p];
-      if (place) counts[place] = (counts[place] || 0) + 1;
-    });
-
-    const data = [];
-    for (let i = 1; i <= 7; i++) data.push(counts[i] || 0);
-
-    const ctx = document.getElementById("chart_" + p).getContext("2d");
-
-    if (playerCharts[p]) {
-      playerCharts[p].data.datasets[0].data = data;
-      playerCharts[p].update();
-    } else {
-      playerCharts[p] = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: ["1st","2nd","3rd","4th","5th","6th","7th"],
-          datasets: [{
-            data,
-            backgroundColor: darkMode
-              ? "rgba(0,229,255,0.6)"
-              : "rgba(66,133,244,0.6)",
-            borderColor: darkMode
-              ? "rgba(0,229,255,1)"
-              : "rgba(66,133,244,1)",
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
-        }
-      });
-    }
-  });
-}
-
-async function loadCSV() {
-  try {
-    const res = await fetch(CSV_URL);
-    const text = await res.text();
-
-    const rows = parseCSV(text);
-    buildResults(rows);
-
-    if (!results.length) {
-      document.getElementById("fileDate").innerText =
-        "Last Game Data Entry: No valid games found.";
-      document.getElementById("statusMsg").innerText =
-        "No valid data after date parsing.";
-      return;
-    }
-
-    const latest = results.reduce((a,b) =>
-      new Date(a.date) > new Date(b.date) ? a : b
-    ).date;
-
-    document.getElementById("fileDate").innerText =
-      "Last Game Data Entry: " + latest;
-
-    buildPlayerCharts();
-    updatePlayerCharts(getFilteredResults());
-
-    document.getElementById("statusMsg").innerText =
-      "Data loaded successfully.";
-  } catch (err) {
-    document.getElementById("statusMsg").innerText =
-      "Could not load CSV.";
-  }
-}
-
-document.getElementById("playerCountFilter").addEventListener("change", () => {
-  updatePlayerCharts(getFilteredResults());
-});
-
-document.getElementById("darkToggle").addEventListener("click", () => {
-  darkMode = !darkMode;
-  document.body.classList.toggle("dark-mode", darkMode);
-  updatePlayerCharts(getFilteredResults());
-});
-
-document.addEventListener("DOMContentLoaded", loadCSV);
-</script>
-
-</body>
-</html>
+  // 2) Excel serial number
+  if (typeof dateVal === "number") {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    const dt = new Date(base.getTime() + dateVal * 86400000);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(dt.getUTCDate()).padStart
