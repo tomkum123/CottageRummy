@@ -11,7 +11,6 @@
       margin: 25px;
       background: #f7f9fc;
       color: #333;
-      transition: background 0.3s;
     }
 
     h2 {
@@ -20,8 +19,7 @@
       text-align: center;
     }
 
-    /* CLASSIC STYLE */
-    body.classic .card {
+    .card {
       background: white;
       padding: 20px;
       border-radius: 10px;
@@ -29,63 +27,32 @@
       margin-bottom: 20px;
     }
 
-    body.classic .input-row {
+    .card h3 {
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+
+    .input-row {
       margin-bottom: 12px;
     }
 
-    body.classic label {
+    label {
       display: inline-block;
-      width: 140px;
+      width: 100px;
       font-weight: bold;
     }
 
-    body.classic input[type="number"],
-    body.classic input[type="date"],
-    body.classic input[type="text"] {
+    input[type="number"],
+    input[type="date"],
+    input[type="text"] {
       padding: 6px;
-      width: 180px;
+      width: 150px;
       border-radius: 6px;
       border: 1px solid #ccc;
     }
 
-    /* MODERN STYLE */
-    body.modern {
-      background: #f4f7fb;
-    }
-
-    body.modern .card {
-      background: #ffffff;
-      padding: 20px;
-      border-radius: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      margin-bottom: 25px;
-      border-left: 6px solid #1a73e8;
-    }
-
-    body.modern .input-row {
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    body.modern label {
-      font-weight: bold;
-      width: 150px;
-      color: #333;
-    }
-
-    body.modern input[type="number"],
-    body.modern input[type="date"],
-    body.modern input[type="text"] {
-      padding: 8px;
-      width: 220px;
-      border-radius: 6px;
-      border: 1px solid #b9c4d6;
-      background: #fdfdfd;
-    }
-
-    /* BUTTONS */
     button {
       padding: 10px 16px;
       margin-right: 10px;
@@ -93,12 +60,6 @@
       border: none;
       cursor: pointer;
       font-weight: bold;
-    }
-
-    #toggleStyleBtn {
-      background: #555;
-      color: white;
-      margin-bottom: 20px;
     }
 
     #saveBtn { background: #34A853; color: white; }
@@ -127,19 +88,16 @@
 
     /* MOBILE COMPACT */
     @media (max-width: 700px) {
-      body.classic label,
-      body.modern label {
+      label {
         width: 100%;
         margin-bottom: 6px;
       }
 
-      body.classic .input-row,
-      body.modern .input-row {
+      .input-row {
         display: block;
       }
 
-      body.classic input,
-      body.modern input {
+      input {
         width: 100%;
       }
 
@@ -151,10 +109,9 @@
   </style>
 </head>
 
-<body class="classic">
+<body>
 
 <h2>Cottage Rummy – Data Entry App</h2>
-<button id="toggleStyleBtn">Switch to Modern View</button>
 
 <div class="card">
   <h3>Last Game Entry</h3>
@@ -209,19 +166,6 @@ players.forEach(p => {
   `;
   container.appendChild(div);
 });
-
-// Toggle Classic / Modern
-document.getElementById("toggleStyleBtn").onclick = () => {
-  if (document.body.classList.contains("classic")) {
-    document.body.classList.remove("classic");
-    document.body.classList.add("modern");
-    document.getElementById("toggleStyleBtn").innerText = "Switch to Classic View";
-  } else {
-    document.body.classList.remove("modern");
-    document.body.classList.add("classic");
-    document.getElementById("toggleStyleBtn").innerText = "Switch to Modern View";
-  }
-};
 
 // Normalize dates
 function normalizeDate(dateStr) {
