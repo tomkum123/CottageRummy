@@ -1,0 +1,9 @@
+{
+  "name": "Cottage Rummy Data Entry",
+  "short_name": "Rummy Entry",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#4285F4",
+  "icons": []
+}

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cottage Rummy – Data Entry App</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 25px;
+      background: #f7f9fc;
+      color: #333;
+    }
+    h2 { font-size: 28px; margin-bottom: 10px; }
+    .input-row { margin-bottom: 12px; }
+    label { display: inline-block; width: 140px; font-weight: bold; }
+    input[type="number"], input[type="date"], input[type="text"] {
+      padding: 6px;
+      width: 200px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 16px;
+      margin-right: 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #saveBtn { background: #34A853; color: white; }
+    #tokenBtn { background: #4285F4; color: white; }
+    #clearBtn { background: #EA4335; color: white; }
+    #status { margin-top: 20px; font-size: 0.9em; font-weight: bold; }
+  </style>
+</head>
+
+<body>
+
+<h2>Cottage Rummy – Data Entry App</h2>
+
+<div class="input-row">
+  <label>Date:</label>
+  <input type="date" id="gameDate">
+</div>
+
+<div id="playerInputs"></div>
+
+<hr>
+
+<h3>GitHub Token</h3>
+<div class="input-row">
+  <label>Token:</label>
+  <input type="text" id="tokenInput" placeholder="Enter GitHub token">
+</div>
+<button id="tokenBtn">Save Token</button>
+
+<hr>
+
+<button id="saveBtn">Commit to GitHub</button>
+<button id="clearBtn">Clear Local Entries</button>
+
+<p id="status"></p>
+
+<script>
+const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
+const repoOwner = "tomkum123";
+const repoName = "CottageRummy";
+const filePath = "docs/Cottage Rummy Data File.csv";
+
+let localEntries = JSON.parse(localStorage.getItem("rummyEntries") || "[]");
+
+// Build player inputs
+const container = document.getElementById("playerInputs");
+players.forEach(p => {
+  const div = document.createElement("div");
+  div.className = "input-row";
+  div.innerHTML = `
+    <label>${p}:</label>
+    <input type="number" id="score_${p}" placeholder="Score or blank">
+  `;
+  container.appendChild(div);
+});
+
+// Save token
+document.getElementById("tokenBtn").onclick = () => {
+  const token = document.getElementById("tokenInput").value.trim();
+  if (!token) {
+    document.getElementById("status").innerText = "Token cannot be empty.";
+    return;
+  }
+  localStorage.setItem("githubToken", token);
+  document.getElementById("status").innerText = "Token saved.";
+};
+
+// Add game locally
+function addLocalGame() {
+  const date = document.getElementById("gameDate").value;
+  if (!date) {
+    document.getElementById("status").innerText = "Please select a date.";
+    return;
+  }
+
+  const row = { Date: date };
+  players.forEach(p => {
+    const val = document.getElementById("score_" + p).value;
+    row[p] = val ? val : "";
+  });
+
+  localEntries.push(row);
+  localStorage.setItem("rummyEntries", JSON.stringify(localEntries));
+}
+
+// Commit to GitHub
+document.getElementById("saveBtn").onclick = async () => {
+  addLocalGame();
+
+  const token = localStorage.getItem("githubToken");
+  if (!token) {
+    document.getElementById("status").innerText = "No GitHub token saved.";
+    return;
+  }
+
+  document.getElementById("status").innerText = "Loading existing CSV...";
+
+  // Fetch existing file metadata
+  const metaRes = await fetch(
+    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const meta = await metaRes.json();
+
+  const csvText = atob(meta.content);
+  const lines = csvText.trim().split("\n");
+  const headers = lines[0].split(",");
+
+  const existingRows = lines.slice(1).map(line => {
+    const cols = line.split(",");
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = cols[i]);
+    return obj;
+  });
+
+  const merged = [...existingRows, ...localEntries];
+
+  const csvLines = ["Date,Christine,Michael,Alaura,Matthew,Kirby,Annmarie,Tom"];
+  merged.forEach(r => {
+    csvLines.push([
+      r.Date,
+      r.Christine || "",
+      r.Michael || "",
+      r.Alaura || "",
+      r.Matthew || "",
+      r.Kirby || "",
+      r.Annmarie || "",
+      r.Tom || ""
+    ].join(","));
+  });
+
+  const newCSV = csvLines.join("\n");
+  const encoded = btoa(newCSV);
+
+  const commitRes = await fetch(
+    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: "Update Cottage Rummy Data File",
+        content: encoded,
+        sha: meta.sha
+      })
+    }
+  );
+
+  if (commitRes.ok) {
+    document.getElementById("status").innerText =
+      "CSV updated on GitHub. Dashboard refreshed.";
+    localEntries = [];
+    localStorage.removeItem("rummyEntries");
+  } else {
+    document.getElementById("status").innerText =
+      "Commit failed. Check token permissions.";
+  }
+};
+
+// Clear local entries
+document.getElementById("clearBtn").onclick = () => {
+  localEntries = [];
+  localStorage.removeItem("rummyEntries");
+  document.getElementById("status").innerText = "Local entries cleared.";
+};
+
+// Register service worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
