@@ -9,33 +9,36 @@
     body {
       font-family: Arial, sans-serif;
       margin: 25px;
-      background: #eef1f5;
-      color: #333;
+      background: #e8f2e8;
+      color: #2f4f2f;
     }
 
     h2 {
-      font-size: 30px;
+      font-size: 32px;
       margin-bottom: 20px;
       text-align: center;
+      color: #1f3d1f;
     }
 
     .card {
-      background: white;
+      background: #ffffff;
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       margin-bottom: 25px;
+      border-left: 6px solid #3b7f3b;
     }
 
     .card h3 {
       margin-top: 0;
       font-size: 22px;
-      border-bottom: 1px solid #ddd;
+      color: #2f4f2f;
+      border-bottom: 1px solid #cddccc;
       padding-bottom: 8px;
     }
 
     .input-row {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -43,15 +46,17 @@
 
     label {
       font-weight: bold;
-      width: 140px;
+      width: 150px;
+      color: #2f4f2f;
     }
 
     input[type="number"], input[type="date"], input[type="text"] {
       padding: 8px;
-      width: 200px;
+      width: 220px;
       border-radius: 6px;
-      border: 1px solid #ccc;
+      border: 1px solid #8fa98f;
       font-size: 15px;
+      background: #f6fff6;
     }
 
     button {
@@ -64,28 +69,30 @@
       font-size: 15px;
     }
 
-    #saveBtn { background: #34A853; color: white; }
-    #tokenBtn { background: #4285F4; color: white; }
-    #clearBtn { background: #EA4335; color: white; }
+    #saveBtn { background: #3b7f3b; color: white; }
+    #tokenBtn { background: #2f6f2f; color: white; }
+    #clearBtn { background: #a83b3b; color: white; }
 
     #status {
       margin-top: 20px;
       font-size: 0.95em;
       font-weight: bold;
       text-align: center;
+      color: #1f3d1f;
     }
 
     .last-entry {
-      background: #f9fafc;
+      background: #f3faf3;
       padding: 15px;
       border-radius: 10px;
-      border: 1px solid #ddd;
+      border: 1px solid #bcd5bc;
       margin-top: 10px;
     }
 
     .last-entry p {
       margin: 6px 0;
       font-size: 15px;
+      color: #2f4f2f;
     }
   </style>
 </head>
@@ -94,6 +101,7 @@
 
 <h2>Cottage Rummy – Data Entry App</h2>
 
+<!-- LAST ENTRY CARD -->
 <div class="card">
   <h3>Last Game Entry</h3>
   <div id="lastEntryBox" class="last-entry">
@@ -101,6 +109,7 @@
   </div>
 </div>
 
+<!-- NEW GAME ENTRY CARD -->
 <div class="card">
   <h3>New Game Entry</h3>
 
@@ -112,6 +121,7 @@
   <div id="playerInputs"></div>
 </div>
 
+<!-- TOKEN CARD -->
 <div class="card">
   <h3>GitHub Token</h3>
   <div class="input-row">
@@ -121,6 +131,7 @@
   <button id="tokenBtn">Save Token</button>
 </div>
 
+<!-- ACTION BUTTONS -->
 <div class="card">
   <button id="saveBtn">Commit to GitHub</button>
   <button id="clearBtn">Clear Local Entries</button>
