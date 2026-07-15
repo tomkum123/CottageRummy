@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cottage Rummy Stats</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 25px;
+      background: #f7f9fc;
+      color: #333;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark-mode {
+      background: #121212;
+      color: #fff;
+    }
+
+    h2 {
+      font-size: 28px;
+      margin-bottom: 5px;
+    }
+
+    #fileDate {
+      font-weight: bold;
+      margin-top: 5px;
+      font-size: 0.85em;
+    }
+
+    #darkToggle {
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #4285F4;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    body.dark-mode #darkToggle {
+      background: #B388FF;
+      color: black;
+    }
+
+    #playerCountFilter {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-left: 10px;
+    }
+
+    #topBar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .player-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-top: 30px;
+    }
+
+    .player-chart-box {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+    body.dark-mode .player-chart-box {
+      background: #1E1E1E;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75em;
+      font-weight: 600;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      color: white;
+    }
+    .badge-light {
+      background: #4285F4;
+    }
+    .badge-dark {
+      background: #00E5FF;
+      color: black;
+    }
+
+    canvas {
+      width: 100% !important;
+      max-height: 350px;
+    }
+
+    #statusMsg {
+      margin-top: 8px;
+      font-size: 0.85em;
+    }
+
+    #notesBox {
+      margin-top: 40px;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      max-width: 900px;
+    }
+    body.dark-mode #notesBox {
+      background: #1E1E1E;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Cottage Rummy – Player Statistics</h2>
+
+<p id="fileDate">Last Game Data Entry: Loading data...</p>
+
+<div id="topBar">
+  <button id="darkToggle">🌙 Dark Mode</button>
+
+  <div>
+    <label><b>Filter by number of players:</b></label>
+    <select id="playerCountFilter">
+      <option value="all">All</option>
+      <option value="3">3 Players</option>
+      <option value="4">4 Players</option>
+      <option value="5">5 Players</option>
+      <option value="6">6 Players</option>
+      <option value="7">7 Players</option>
+    </select>
+  </div>
+</div>
+
+<div id="statusMsg">Loading data...</div>
+
+<div class="player-grid" id="playerGrid"></div>
+
+<div id="notesBox">
+  <h3>Notes</h3>
+  <p><strong>Win Rate %</strong> — Percentage of games a player finished in <strong>1st place</strong>.</p>
+  <p><strong>Average Placement</strong> — The player’s <strong>average finishing position</strong> across all games they played.</p>
+</div>
+
+<script>
+const CSV_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.csv";
+
+const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
+let results = [];
+let playerCharts = {};
+let darkMode = false;
+
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  const headers = lines[0].split(",");
+
+  return lines.slice(1).map(line => {
+    const cols = line.split(",");
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = cols[i]);
+    return obj;
+  });
+}
+
+// Robust date parsing: supports YYYY-MM-DD and MM/DD/YYYY
+function convertToISO(dateStr) {
+  if (!dateStr) return null;
+
+  // ISO: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-");
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+  }
+
+  // Slash: MM/DD/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+    const [m, d, y] = dateStr.split("/");
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+  }
+
+  // Fallback
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return null;
+}
+
+function buildResults(rows) {
+  results = [];
+
+  rows.forEach(r => {
+    const iso = convertToISO(r["Date"]);
+    if (!iso) return;
+
+    const scores = {};
+    players.forEach(p => {
+      const val = r[p];
+      if (val && !isNaN(Number(val))) scores[p] = Number(val);
+    });
+
+    const participants = Object.keys(scores);
+    if (!participants.length) return;
+
+    const sorted = participants
+      .map(p => ({ player: p, score: scores[p] }))
+      .sort((a,b) => a.score - b.score);
+
+    const placements = {};
+    let place = 1;
+
+    for (let i = 0; i < sorted.length; ) {
+      let j = i + 1;
+      while (j < sorted.length && sorted[j].score === sorted[i].score) j++;
+      sorted.slice(i, j).forEach(s => placements[s.player] = place);
+      place += (j - i);
+      i = j;
+    }
+
+    results.push({
+      date: iso,
+      playersCount: participants.length,
+      placements
+    });
+  });
+
+  // Sort results by date ascending
+  results.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function getFilteredResults() {
+  const filter = document.getElementById("playerCountFilter").value;
+  if (filter === "all") return results;
+  return results.filter(r => r.playersCount == filter);
+}
+
+function calculateStats(filtered, player) {
+  let wins = 0, total = 0, sum = 0;
+
+  filtered.forEach(g => {
+    const p = g.placements[player];
+    if (p) {
+      total++;
+      sum += p;
+      if (p === 1) wins++;
+    }
+  });
+
+  return {
+    winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
+    avgPlacement: total ? (sum / total).toFixed(2) : "-"
+  };
+}
+
+function buildPlayerCharts() {
+  const grid = document.getElementById("playerGrid");
+  grid.innerHTML = "";
+
+  players.forEach(p => {
+    const box = document.createElement("div");
+    box.className = "player-chart-box";
+    box.innerHTML = `
+      <h4>${p}</h4>
+      <div id="stats_${p}"></div>
+      <canvas id="chart_${p}"></canvas>
+    `;
+    grid.appendChild(box);
+  });
+}
+
+function updatePlayerCharts(filtered) {
+  players.forEach(p => {
+    const stats = calculateStats(filtered, p);
+
+    document.getElementById("stats_" + p).innerHTML = `
+      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.winRate}% Win Rate</span>
+      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.avgPlacement} Avg Placement</span>
+    `;
+
+    const counts = {};
+    filtered.forEach(g => {
+      const place = g.placements[p];
+      if (place) counts[place] = (counts[place] || 0) + 1;
+    });
+
+    const data = [];
+    for (let i = 1; i <= 7; i++) data.push(counts[i] || 0);
+
+    const ctx = document.getElementById("chart_" + p).getContext("2d");
+
+    if (playerCharts[p]) {
+      playerCharts[p].data.datasets[0].data = data;
+      playerCharts[p].update();
+    } else {
+      playerCharts[p] = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["1st","2nd","3rd","4th","5th","6th","7th"],
+          datasets: [{
+            data,
+            backgroundColor: darkMode
+              ? "rgba(0,229,255,0.6)"
+              : "rgba(66,133,244,0.6)",
+            borderColor: darkMode
+              ? "rgba(0,229,255,1)"
+              : "rgba(66,133,244,1)",
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+  });
+}
+
+async function loadCSV() {
+  try {
+    const res = await fetch(CSV_URL);
+    const text = await res.text();
+
+    const rows = parseCSV(text);
+    buildResults(rows);
+
+    if (!results.length) {
+      document.getElementById("fileDate").innerText =
+        "Last Game Data Entry: No valid games found.";
+      document.getElementById("statusMsg").innerText =
+        "No valid data after date parsing.";
+      return;
+    }
+
+    const latest = results.reduce((a,b) =>
+      new Date(a.date) > new Date(b.date) ? a : b
+    ).date;
+
+    document.getElementById("fileDate").innerText =
+      "Last Game Data Entry: " + latest;
+
+    buildPlayerCharts();
+    updatePlayerCharts(getFilteredResults());
+
+    document.getElementById("statusMsg").innerText =
+      "Data loaded successfully.";
+  } catch (err) {
+    document.getElementById("statusMsg").innerText =
+      "Could not load CSV.";
+  }
+}
+
+document.getElementById("playerCountFilter").addEventListener("change", () => {
+  updatePlayerCharts(getFilteredResults());
+});
+
+document.getElementById("darkToggle").addEventListener("click", () => {
+  darkMode = !darkMode;
+  document.body.classList.toggle("dark-mode", darkMode);
+  updatePlayerCharts(getFilteredResults());
+});
+
+document.addEventListener("DOMContentLoaded", loadCSV);
+</script>
+
+</body>
+</html>
