@@ -8,136 +8,237 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 25px;
-      background: #e8f2e8;
-      color: #2f4f2f;
+      margin: 0;
+      background: #f7f9fc;
+      color: #333;
+      transition: background 0.3s;
     }
 
-    h2 {
-      font-size: 32px;
+    /* SIDEBAR */
+    #sidebar {
+      width: 220px;
+      background: #1a73e8;
+      color: white;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    #sidebar h2 {
+      font-size: 22px;
       margin-bottom: 20px;
-      text-align: center;
-      color: #1f3d1f;
     }
 
-    .card {
+    #sidebar button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: none;
+      border-radius: 6px;
+      background: #185abc;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* MAIN CONTENT */
+    #main {
+      margin-left: 240px;
+      padding: 25px;
+    }
+
+    h3 {
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+
+    /* CLASSIC STYLE */
+    body.classic .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    body.classic .input-row {
+      margin-bottom: 12px;
+    }
+
+    body.classic label {
+      display: inline-block;
+      width: 140px;
+      font-weight: bold;
+    }
+
+    body.classic input[type="number"],
+    body.classic input[type="date"],
+    body.classic input[type="text"] {
+      padding: 6px;
+      width: 180px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    /* MODERN STYLE */
+    body.modern {
+      background: #f4f7fb;
+    }
+
+    body.modern .card {
       background: #ffffff;
       padding: 20px;
       border-radius: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       margin-bottom: 25px;
-      border-left: 6px solid #3b7f3b;
+      border-left: 6px solid #1a73e8;
     }
 
-    .card h3 {
-      margin-top: 0;
-      font-size: 22px;
-      color: #2f4f2f;
-      border-bottom: 1px solid #cddccc;
-      padding-bottom: 8px;
-    }
-
-    .input-row {
+    body.modern .input-row {
       margin-bottom: 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    label {
+    body.modern label {
       font-weight: bold;
       width: 150px;
-      color: #2f4f2f;
+      color: #333;
     }
 
-    input[type="number"], input[type="date"], input[type="text"] {
+    body.modern input[type="number"],
+    body.modern input[type="date"],
+    body.modern input[type="text"] {
       padding: 8px;
       width: 220px;
       border-radius: 6px;
-      border: 1px solid #8fa98f;
-      font-size: 15px;
-      background: #f6fff6;
+      border: 1px solid #b9c4d6;
+      background: #fdfdfd;
     }
 
-    button {
-      padding: 12px 18px;
+    /* BUTTONS */
+    button.action {
+      padding: 10px 16px;
       margin-right: 10px;
       border-radius: 8px;
       border: none;
       cursor: pointer;
       font-weight: bold;
-      font-size: 15px;
     }
 
-    #saveBtn { background: #3b7f3b; color: white; }
-    #tokenBtn { background: #2f6f2f; color: white; }
-    #clearBtn { background: #a83b3b; color: white; }
+    #saveBtn { background: #34A853; color: white; }
+    #tokenBtn { background: #4285F4; color: white; }
+    #clearBtn { background: #EA4335; color: white; }
 
     #status {
       margin-top: 20px;
-      font-size: 0.95em;
+      font-size: 0.9em;
       font-weight: bold;
       text-align: center;
-      color: #1f3d1f;
     }
 
     .last-entry {
-      background: #f3faf3;
-      padding: 15px;
-      border-radius: 10px;
-      border: 1px solid #bcd5bc;
+      background: #f9fafc;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
       margin-top: 10px;
     }
 
     .last-entry p {
-      margin: 6px 0;
-      font-size: 15px;
-      color: #2f4f2f;
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    /* MOBILE COMPACT */
+    @media (max-width: 700px) {
+      #sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+      }
+
+      #main {
+        margin-left: 0;
+      }
+
+      body.classic label,
+      body.modern label {
+        width: 100%;
+        margin-bottom: 6px;
+      }
+
+      body.classic .input-row,
+      body.modern .input-row {
+        display: block;
+      }
+
+      body.classic input,
+      body.modern input {
+        width: 100%;
+      }
+
+      button.action {
+        width: 100%;
+        margin-bottom: 10px;
+      }
     }
   </style>
 </head>
 
-<body>
+<body class="classic">
 
-<h2>Cottage Rummy – Data Entry App</h2>
-
-<!-- LAST ENTRY CARD -->
-<div class="card">
-  <h3>Last Game Entry</h3>
-  <div id="lastEntryBox" class="last-entry">
-    <p>Loading last entry...</p>
-  </div>
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <h2>Rummy Menu</h2>
+  <button id="toggleStyleBtn">Switch to Modern View</button>
+  <button onclick="window.location.reload()">Refresh</button>
 </div>
 
-<!-- NEW GAME ENTRY CARD -->
-<div class="card">
-  <h3>New Game Entry</h3>
+<!-- MAIN CONTENT -->
+<div id="main">
 
-  <div class="input-row">
-    <label>Date:</label>
-    <input type="date" id="gameDate">
+  <div class="card">
+    <h3>Last Game Entry</h3>
+    <div id="lastEntryBox" class="last-entry">
+      <p>Loading last entry...</p>
+    </div>
   </div>
 
-  <div id="playerInputs"></div>
-</div>
+  <div class="card">
+    <h3>New Game Entry</h3>
 
-<!-- TOKEN CARD -->
-<div class="card">
-  <h3>GitHub Token</h3>
-  <div class="input-row">
-    <label>Token:</label>
-    <input type="text" id="tokenInput" placeholder="Enter GitHub token">
+    <div class="input-row">
+      <label>Date:</label>
+      <input type="date" id="gameDate">
+    </div>
+
+    <div id="playerInputs"></div>
   </div>
-  <button id="tokenBtn">Save Token</button>
-</div>
 
-<!-- ACTION BUTTONS -->
-<div class="card">
-  <button id="saveBtn">Commit to GitHub</button>
-  <button id="clearBtn">Clear Local Entries</button>
-</div>
+  <div class="card">
+    <h3>GitHub Token</h3>
+    <div class="input-row">
+      <label>Token:</label>
+      <input type="text" id="tokenInput" placeholder="Enter GitHub token">
+    </div>
+    <button id="tokenBtn" class="action">Save Token</button>
+  </div>
 
-<p id="status"></p>
+  <div class="card">
+    <button id="saveBtn" class="action">Commit to GitHub</button>
+    <button id="clearBtn" class="action">Clear Local Entries</button>
+  </div>
+
+  <p id="status"></p>
+
+</div>
 
 <script>
 const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
@@ -159,22 +260,27 @@ players.forEach(p => {
   container.appendChild(div);
 });
 
-// Normalize dates to ISO YYYY-MM-DD
+// Toggle Classic / Modern
+document.getElementById("toggleStyleBtn").onclick = () => {
+  if (document.body.classList.contains("classic")) {
+    document.body.classList.remove("classic");
+    document.body.classList.add("modern");
+    document.getElementById("toggleStyleBtn").innerText = "Switch to Classic View";
+  } else {
+    document.body.classList.remove("modern");
+    document.body.classList.add("classic");
+    document.getElementById("toggleStyleBtn").innerText = "Switch to Modern View";
+  }
+};
+
+// Normalize dates
 function normalizeDate(dateStr) {
   if (!dateStr) return "";
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
     const [m, d, y] = dateStr.split("/");
     return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
   }
-
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(dateStr)) {
-    const [y, m, d] = dateStr.split("/");
-    return `${y}-${m}-${d}`;
-  }
-
   const dt = new Date(dateStr);
   if (!isNaN(dt)) {
     const y = dt.getFullYear();
@@ -182,11 +288,10 @@ function normalizeDate(dateStr) {
     const d = String(dt.getDate()).padStart(2,"0");
     return `${y}-${m}-${d}`;
   }
-
   return dateStr;
 }
 
-// Load last entry from GitHub
+// Load last entry
 async function loadLastEntry() {
   const token = localStorage.getItem("githubToken");
   if (!token) {
@@ -228,143 +333,4 @@ async function loadLastEntry() {
 
 // Save token
 document.getElementById("tokenBtn").onclick = () => {
-  const input = document.getElementById("tokenInput");
-  const token = input && input.value ? input.value.trim() : "";
-
-  if (!token) {
-    document.getElementById("status").innerText = "Token cannot be empty.";
-    return;
-  }
-
-  localStorage.setItem("githubToken", token);
-  document.getElementById("status").innerText = "Token saved.";
-  loadLastEntry();
-};
-
-
-// Add game locally
-function addLocalGame() {
-  const date = document.getElementById("gameDate").value;
-  if (!date) {
-    document.getElementById("status").innerText = "Please select a date.";
-    return;
-  }
-
-  const row = { Date: date };
-  players.forEach(p => {
-    const val = document.getElementById("score_" + p).value;
-    row[p] = val ? val : "";
-  });
-
-  localEntries.push(row);
-  localStorage.setItem("rummyEntries", JSON.stringify(localEntries));
-}
-
-// Commit to GitHub
-document.getElementById("saveBtn").onclick = async () => {
-  addLocalGame();
-
-  const token = localStorage.getItem("githubToken");
-  if (!token) {
-    document.getElementById("status").innerText = "No GitHub token saved.";
-    return;
-  }
-
-  document.getElementById("status").innerText = "Loading existing CSV...";
-
-  const metaRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-
-  if (!metaRes.ok) {
-    document.getElementById("status").innerText = "Failed to load CSV.";
-    return;
-  }
-
-  const meta = await metaRes.json();
-  const csvText = atob(meta.content);
-  const lines = csvText.trim().split("\n");
-  const headers = lines[0].split(",");
-
-  const existingRows = lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = cols[i]);
-    return obj;
-  });
-
-  const merged = [...existingRows, ...localEntries].map(r => ({
-    Date: normalizeDate(r.Date),
-    Christine: r.Christine || "",
-    Michael: r.Michael || "",
-    Alaura: r.Alaura || "",
-    Matthew: r.Matthew || "",
-    Kirby: r.Kirby || "",
-    Annmarie: r.Annmarie || "",
-    Tom: r.Tom || ""
-  }));
-
-  const csvLines = ["Date,Christine,Michael,Alaura,Matthew,Kirby,Annmarie,Tom"];
-  merged.forEach(r => {
-    csvLines.push([
-      r.Date,
-      r.Christine,
-      r.Michael,
-      r.Alaura,
-      r.Matthew,
-      r.Kirby,
-      r.Annmarie,
-      r.Tom
-    ].join(","));
-  });
-
-  const newCSV = csvLines.join("\n");
-  const encoded = btoa(newCSV);
-
-  const commitRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Normalize dates and update Cottage Rummy Data File",
-        content: encoded,
-        sha: meta.sha
-      })
-    }
-  );
-
-  if (commitRes.ok) {
-    document.getElementById("status").innerText =
-      "CSV updated. Dates normalized.";
-    localEntries = [];
-    localStorage.removeItem("rummyEntries");
-    loadLastEntry();
-  } else {
-    document.getElementById("status").innerText =
-      "Commit failed. Check token permissions.";
-  }
-};
-
-// Clear local entries
-document.getElementById("clearBtn").onclick = () => {
-  localEntries = [];
-  localStorage.removeItem("rummyEntries");
-  document.getElementById("status").innerText = "Local entries cleared.";
-};
-
-// Load last entry on startup
-loadLastEntry();
-
-// Register service worker
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
-}
-</script>
-
-</body>
-</html>
+  const input = document.getElementById("
