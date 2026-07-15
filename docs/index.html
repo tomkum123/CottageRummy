@@ -75,6 +75,7 @@
     #saveBtn { background: #34A853; color: white; }
     #tokenBtn { background: #4285F4; color: white; }
     #clearBtn { background: #EA4335; color: white; }
+    #refreshLastBtn { background: #4285F4; color: white; }
 
     #status {
       margin-top: 20px;
@@ -97,6 +98,23 @@
       font-size: 14px;
     }
 
+    .pending-list {
+      background: #f7f9ff;
+      padding: 10px;
+      border-radius: 8px;
+      border-left: 4px solid #34A853;
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .pending-item {
+      margin-bottom: 6px;
+      border-bottom: 1px dashed #ccc;
+      padding-bottom: 4px;
+    }
+
     @media (max-width: 700px) {
       label {
         width: 100%;
@@ -115,7 +133,8 @@
     }
   </style>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Lighter SheetJS build to reduce CPU -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.core.min.js"></script>
 </head>
 
 <body>
@@ -127,6 +146,7 @@
   <div id="lastEntryBox" class="last-entry">
     <p>Loading last entry...</p>
   </div>
+  <button id="refreshLastBtn">Refresh Last Entry</button>
 </div>
 
 <div class="card">
@@ -138,6 +158,13 @@
   </div>
 
   <div id="playerInputs"></div>
+</div>
+
+<div class="card">
+  <h3>Pending Local Entries (not yet committed)</h3>
+  <div id="pendingBox" class="pending-list">
+    <p>No pending entries.</p>
+  </div>
 </div>
 
 <div class="card">
@@ -171,23 +198,62 @@ players.forEach(p => {
   div.className = "input-row";
   div.innerHTML = `
     <label>${p}:</label>
-    <input type="number" id="score_${p}" placeholder="Score or blank">
+    <input type="number" id="score_${p}" placeholder="Score or blank" step="1">
   `;
   container.appendChild(div);
 });
 
-// Normalize dates
-function normalizeDate(dateStr) {
-  if (!dateStr) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  const dt = new Date(dateStr);
-  if (!isNaN(dt)) {
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth()+1).padStart(2,"0");
-    const d = String(dt.getDate()).padStart(2,"0");
+// Robust Excel-aware date normalizer
+function normalizeDate(value) {
+  if (value == null || value === "" || value === 0) return "";
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    const ms = base.getTime() + value * 86400000;
+    const dt = new Date(ms);
+
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(dt.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
-  return dateStr;
+
+  if (typeof value === "string") {
+    const dt = new Date(value);
+    if (!isNaN(dt)) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).toString().padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  return "";
+}
+
+// Render pending local entries
+function renderPending() {
+  const box = document.getElementById("pendingBox");
+  if (!localEntries.length) {
+    box.innerHTML = "<p>No pending entries.</p>";
+    return;
+  }
+
+  let html = "";
+  localEntries.forEach((row, idx) => {
+    html += `<div class="pending-item"><strong>${idx + 1}.</strong> Date: ${row.Date || ""}`;
+    players.forEach(p => {
+      if (row[p] !== "" && row[p] != null) {
+        html += ` | ${p}: ${row[p]}`;
+      }
+    });
+    html += "</div>";
+  });
+  box.innerHTML = html;
 }
 
 // Load last entry from XLSX
@@ -199,35 +265,54 @@ async function loadLastEntry() {
     return;
   }
 
-  const res = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  document.getElementById("lastEntryBox").innerHTML =
+    "<p>Loading last entry from GitHub...</p>";
 
-  if (!res.ok) {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${encodeURIComponent(filePath)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err.message || "Could not load the Excel file.";
+      document.getElementById("lastEntryBox").innerHTML =
+        `<p>Error loading XLSX: ${msg}</p>`;
+      return;
+    }
+
+    const meta = await res.json();
+
+    const binary = atob(meta.content);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const workbook = XLSX.read(bytes, { type: "array" });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false // treat dates as strings where possible
+    });
+
+    if (!rows.length) {
+      document.getElementById("lastEntryBox").innerHTML =
+        "<p>No rows found in XLSX.</p>";
+      return;
+    }
+
+    const lastEntry = rows[rows.length - 1];
+
+    const dateStr = normalizeDate(lastEntry.Date);
+    let html = `<p><strong>Date:</strong> ${dateStr}</p>`;
+    players.forEach(p => {
+      html += `<p><strong>${p}:</strong> ${lastEntry[p] || ""}</p>`;
+    });
+
+    document.getElementById("lastEntryBox").innerHTML = html;
+  } catch (e) {
     document.getElementById("lastEntryBox").innerHTML =
-      "<p>Could not load the Excel file.</p>";
-    return;
+      `<p>Unexpected error loading last entry: ${e.message}</p>`;
   }
-
-  const meta = await res.json();
-
-  // Decode XLSX
-  const binary = atob(meta.content);
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-  const workbook = XLSX.read(bytes, { type: "array" });
-
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-  const lastEntry = rows[rows.length - 1];
-
-  let html = `<p><strong>Date:</strong> ${normalizeDate(lastEntry.Date)}</p>`;
-  players.forEach(p => {
-    html += `<p><strong>${p}:</strong> ${lastEntry[p] || ""}</p>`;
-  });
-
-  document.getElementById("lastEntryBox").innerHTML = html;
 }
 
 // Save token
@@ -242,27 +327,86 @@ document.getElementById("tokenBtn").onclick = () => {
   loadLastEntry();
 };
 
-// Add game locally
-function addLocalGame() {
+// Validate and build a local game row
+function buildGameRow() {
   const date = document.getElementById("gameDate").value;
   if (!date) {
     document.getElementById("status").innerText = "Please select a date.";
+    return null;
+  }
+
+  const normalizedDate = normalizeDate(date);
+  const row = { Date: normalizedDate };
+
+  let anyScore = false;
+  for (const p of players) {
+    const input = document.getElementById("score_" + p);
+    const val = input.value.trim();
+
+    if (val === "") {
+      row[p] = "";
+      continue;
+    }
+
+    const num = Number(val);
+    if (!Number.isFinite(num)) {
+      document.getElementById("status").innerText =
+        `Invalid score for ${p}. Please enter a number or leave blank.`;
+      return null;
+    }
+
+    anyScore = true;
+    row[p] = num;
+  }
+
+  if (!anyScore) {
+    document.getElementById("status").innerText =
+      "At least one player must have a score.";
+    return null;
+  }
+
+  return row;
+}
+
+// Check for duplicate in localEntries (same date + same scores)
+function isDuplicateLocal(row) {
+  return localEntries.some(existing => {
+    if (existing.Date !== row.Date) return false;
+    for (const p of players) {
+      if (String(existing[p] || "") !== String(row[p] || "")) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+// Add game locally
+function addLocalGame() {
+  const row = buildGameRow();
+  if (!row) return;
+
+  if (isDuplicateLocal(row)) {
+    document.getElementById("status").innerText =
+      "This game entry already exists in local pending entries.";
     return;
   }
 
-  const row = { Date: normalizeDate(date) };
-  players.forEach(p => {
-    const val = document.getElementById("score_" + p).value;
-    row[p] = val ? val : "";
-  });
-
   localEntries.push(row);
   localStorage.setItem("rummyEntries", JSON.stringify(localEntries));
+  renderPending();
+  document.getElementById("status").innerText =
+    "Game added to local pending entries.";
 }
 
 // Commit XLSX to GitHub
 document.getElementById("saveBtn").onclick = async () => {
+  // First add current form as a local game (if valid)
   addLocalGame();
+
+  if (!localEntries.length) {
+    return;
+  }
 
   const token = localStorage.getItem("githubToken");
   if (!token) {
@@ -272,66 +416,100 @@ document.getElementById("saveBtn").onclick = async () => {
 
   document.getElementById("status").innerText = "Loading existing XLSX...";
 
-  const metaRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  try {
+    const metaRes = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${encodeURIComponent(filePath)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-  if (!metaRes.ok) {
-    document.getElementById("status").innerText = "Failed to load XLSX.";
-    return;
-  }
-
-  const meta = await metaRes.json();
-
-  // Decode XLSX
-  const binary = atob(meta.content);
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-  const workbook = XLSX.read(bytes, { type: "array" });
-
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const existingRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-  const merged = [...existingRows, ...localEntries];
-
-  // Convert merged rows back to XLSX
-  const newSheet = XLSX.utils.json_to_sheet(merged);
-  const newWorkbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Sheet1");
-
-  // Generate binary XLSX
-  const xlsxBinary = XLSX.write(newWorkbook, { bookType: "xlsx", type: "binary" });
-
-  // Convert binary → base64
-  const encoded = btoa(
-    xlsxBinary.split("").map(c => String.fromCharCode(c.charCodeAt(0))).join("")
-  );
-
-  const commitRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Update XLSX with new Cottage Rummy entries",
-        content: encoded,
-        sha: meta.sha
-      })
+    if (!metaRes.ok) {
+      const err = await metaRes.json().catch(() => ({}));
+      const msg = err.message || "Failed to load XLSX.";
+      document.getElementById("status").innerText =
+        `Failed to load XLSX: ${msg}`;
+      return;
     }
-  );
 
-  if (commitRes.ok) {
+    const meta = await metaRes.json();
+
+    const binary = atob(meta.content);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const workbook = XLSX.read(bytes, { type: "array" });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const existingRows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false
+    });
+
+    // Merge existing rows + local entries
+    const merged = [...existingRows];
+
+    // Avoid duplicates against existingRows (same Date + scores)
+    localEntries.forEach(row => {
+      const exists = existingRows.some(er => {
+        if (normalizeDate(er.Date) !== row.Date) return false;
+        for (const p of players) {
+          if (String(er[p] || "") !== String(row[p] || "")) {
+            return false;
+          }
+        }
+        return true;
+      });
+      if (!exists) {
+        merged.push(row);
+      }
+    });
+
+    const newSheet = XLSX.utils.json_to_sheet(merged, {
+      cellDates: false // keep dates as text
+    });
+    const newWorkbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Sheet1");
+
+    const xlsxBinary = XLSX.write(newWorkbook, {
+      bookType: "xlsx",
+      type: "binary"
+    });
+
+    const encoded = btoa(
+      xlsxBinary.split("").map(c => String.fromCharCode(c.charCodeAt(0))).join("")
+    );
+
+    document.getElementById("status").innerText = "Committing updated XLSX to GitHub...";
+
+    const commitRes = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${encodeURIComponent(filePath)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Update XLSX with new Cottage Rummy entries",
+          content: encoded,
+          sha: meta.sha
+        })
+      }
+    );
+
+    if (commitRes.ok) {
+      document.getElementById("status").innerText =
+        "XLSX updated successfully!";
+      localEntries = [];
+      localStorage.removeItem("rummyEntries");
+      renderPending();
+      loadLastEntry();
+    } else {
+      const err = await commitRes.json().catch(() => ({}));
+      const msg = err.message || "Commit failed. Check token permissions.";
+      document.getElementById("status").innerText =
+        `Commit failed: ${msg}`;
+    }
+  } catch (e) {
     document.getElementById("status").innerText =
-      "XLSX updated successfully!";
-    localEntries = [];
-    localStorage.removeItem("rummyEntries");
-    loadLastEntry();
-  } else {
-    document.getElementById("status").innerText =
-      "Commit failed. Check token permissions.";
+      `Unexpected error during commit: ${e.message}`;
   }
 };
 
@@ -339,10 +517,17 @@ document.getElementById("saveBtn").onclick = async () => {
 document.getElementById("clearBtn").onclick = () => {
   localEntries = [];
   localStorage.removeItem("rummyEntries");
+  renderPending();
   document.getElementById("status").innerText = "Local entries cleared.";
 };
 
-// Load last entry on startup
+// Refresh last entry button
+document.getElementById("refreshLastBtn").onclick = () => {
+  loadLastEntry();
+};
+
+// Initial render
+renderPending();
 loadLastEntry();
 
 // Register service worker
