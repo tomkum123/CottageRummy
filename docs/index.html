@@ -2,8 +2,10 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Cottage Rummy – Data Entry App</title>
-  <link rel="manifest" href="manifest.json">
+  <title>Cottage Rummy Stats</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body {
@@ -11,357 +13,367 @@
       margin: 25px;
       background: #f7f9fc;
       color: #333;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark-mode {
+      background: #121212;
+      color: #fff;
     }
 
     h2 {
       font-size: 28px;
-      margin-bottom: 10px;
-      text-align: center;
+      margin-bottom: 5px;
     }
 
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-    }
-
-    .card h3 {
-      margin-top: 0;
-      font-size: 20px;
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 6px;
-    }
-
-    .input-row {
-      margin-bottom: 12px;
-    }
-
-    label {
-      display: inline-block;
-      width: 100px;
+    #fileDate {
       font-weight: bold;
+      margin-top: 5px;
+      font-size: 0.85em;
     }
 
-    input[type="number"],
-    input[type="date"],
-    input[type="text"] {
-      padding: 6px;
-      width: 150px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-
-    button {
+    #darkToggle {
       padding: 10px 16px;
-      margin-right: 10px;
       border-radius: 8px;
-      border: none;
+      background: #4285F4;
+      color: white;
       cursor: pointer;
       font-weight: bold;
     }
-
-    #saveBtn { background: #34A853; color: white; }
-    #tokenBtn { background: #4285F4; color: white; }
-    #clearBtn { background: #EA4335; color: white; }
-
-    #status {
-      margin-top: 20px;
-      font-size: 0.9em;
-      font-weight: bold;
-      text-align: center;
+    body.dark-mode #darkToggle {
+      background: #B388FF;
+      color: black;
     }
 
-    .last-entry {
-      background: #f9fafc;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      margin-top: 10px;
+    #playerCountFilter {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-left: 10px;
     }
 
-    .last-entry p {
-      margin: 4px 0;
-      font-size: 14px;
+    #topBar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
     }
 
-    /* MOBILE COMPACT */
-    @media (max-width: 700px) {
-      label {
-        width: 100%;
-        margin-bottom: 6px;
-      }
+    .player-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-top: 30px;
+    }
 
-      .input-row {
-        display: block;
-      }
+    .player-chart-box {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+    body.dark-mode .player-chart-box {
+      background: #1E1E1E;
+    }
 
-      input {
-        width: 100%;
-      }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75em;
+      font-weight: 600;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      color: white;
+    }
+    .badge-light {
+      background: #4285F4;
+    }
+    .badge-dark {
+      background: #00E5FF;
+      color: black;
+    }
 
-      button {
-        width: 100%;
-        margin-bottom: 10px;
-      }
+    canvas {
+      width: 100% !important;
+      max-height: 350px;
+    }
+
+    #statusMsg {
+      margin-top: 8px;
+      font-size: 0.85em;
+    }
+
+    #notesBox {
+      margin-top: 40px;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      max-width: 900px;
+    }
+    body.dark-mode #notesBox {
+      background: #1E1E1E;
     }
   </style>
 </head>
 
 <body>
 
-<h2>Cottage Rummy – Data Entry App</h2>
+<h2>Cottage Rummy – Player Statistics</h2>
 
-<div class="card">
-  <h3>Last Game Entry</h3>
-  <div id="lastEntryBox" class="last-entry">
-    <p>Loading last entry...</p>
+<p id="fileDate">Last Game Data Entry: Loading data...</p>
+
+<div id="topBar">
+  <button id="darkToggle">🌙 Dark Mode</button>
+
+  <div>
+    <label><b>Filter by number of players:</b></label>
+    <select id="playerCountFilter">
+      <option value="all">All</option>
+      <option value="3">3 Players</option>
+      <option value="4">4 Players</option>
+      <option value="5">5 Players</option>
+      <option value="6">6 Players</option>
+      <option value="7">7 Players</option>
+    </select>
   </div>
 </div>
 
-<div class="card">
-  <h3>New Game Entry</h3>
+<div id="statusMsg">Loading data...</div>
 
-  <div class="input-row">
-    <label>Date:</label>
-    <input type="date" id="gameDate">
-  </div>
+<div class="player-grid" id="playerGrid"></div>
 
-  <div id="playerInputs"></div>
+<div id="notesBox">
+  <h3>Notes</h3>
+  <p><strong>Win Rate %</strong> — Percentage of games a player finished in <strong>1st place</strong>.</p>
+  <p><strong>Average Placement</strong> — The player’s <strong>average finishing position</strong> across all games they played.</p>
 </div>
-
-<div class="card">
-  <h3>GitHub Token</h3>
-  <div class="input-row">
-    <label>Token:</label>
-    <input type="text" id="tokenInput" placeholder="Enter GitHub token">
-  </div>
-  <button id="tokenBtn">Save Token</button>
-</div>
-
-<div class="card">
-  <button id="saveBtn">Commit to GitHub</button>
-  <button id="clearBtn">Clear Local Entries</button>
-</div>
-
-<p id="status"></p>
 
 <script>
+const EXCEL_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.xlsx";
+
 const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
-const repoOwner = "tomkum123";
-const repoName = "CottageRummy";
-const filePath = "docs/Cottage Rummy Data File.csv";
+let results = [];
+let playerCharts = {};
+let darkMode = false;
 
-let localEntries = JSON.parse(localStorage.getItem("rummyEntries") || "[]");
+// ⭐ Load Excel instead of CSV
+async function loadExcel() {
+  const res = await fetch(EXCEL_URL);
+  const arrayBuffer = await res.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-// Build player inputs
-const container = document.getElementById("playerInputs");
-players.forEach(p => {
-  const div = document.createElement("div");
-  div.className = "input-row";
-  div.innerHTML = `
-    <label>${p}:</label>
-    <input type="number" id="score_${p}" placeholder="Score or blank">
-  `;
-  container.appendChild(div);
-});
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+}
 
-// Normalize dates
-function normalizeDate(dateStr) {
-  if (!dateStr) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    const [m, d, y] = dateStr.split("/");
-    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  }
-  const dt = new Date(dateStr);
-  if (!isNaN(dt)) {
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth()+1).padStart(2,"0");
-    const d = String(dt.getDate()).padStart(2,"0");
+// ⭐ FIXED: Excel-compatible date parser
+function convertToISO(dateVal) {
+  if (dateVal == null || dateVal === "") return null;
+
+  // 1) Excel Date object
+  if (dateVal instanceof Date) {
+    const y = dateVal.getFullYear();
+    const m = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const d = String(dateVal.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
-  return dateStr;
+
+  // 2) Excel serial number
+  if (typeof dateVal === "number") {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    const dt = new Date(base.getTime() + dateVal * 86400000);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(dt.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3) String formats
+  let s = String(dateVal).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const [m, d, y] = s.split("/");
+    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+
+  return null;
 }
 
-// Load last entry
-async function loadLastEntry() {
-  const token = localStorage.getItem("githubToken");
-  if (!token) {
-    document.getElementById("lastEntryBox").innerHTML =
-      "<p>No token saved. Cannot load last entry.</p>";
-    return;
-  }
+function buildResults(rows) {
+  results = [];
 
-  const res = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  rows.forEach(r => {
+    const iso = convertToISO(r["Date"]);
+    if (!iso) return;
 
-  if (!res.ok) {
-    document.getElementById("lastEntryBox").innerHTML =
-      "<p>Could not load CSV.</p>";
-    return;
-  }
+    const scores = {};
+    players.forEach(p => {
+      const val = r[p];
+      if (val !== "" && !isNaN(Number(val))) scores[p] = Number(val);
+    });
 
-  const meta = await res.json();
-  const csvText = atob(meta.content);
-  const lines = csvText.trim().split("\n");
+    const participants = Object.keys(scores);
+    if (!participants.length) return;
 
-  const headers = lines[0].split(",");
-  const lastLine = lines[lines.length - 1].split(",");
+    const sorted = participants
+      .map(p => ({ player: p, score: scores[p] }))
+      .sort((a,b) => a.score - b.score);
 
-  let lastEntry = {};
-  headers.forEach((h, i) => lastEntry[h] = lastLine[i]);
+    const placements = {};
+    let place = 1;
 
-  lastEntry.Date = normalizeDate(lastEntry.Date);
-
-  let html = `<p><strong>Date:</strong> ${lastEntry.Date}</p>`;
-  players.forEach(p => {
-    html += `<p><strong>${p}:</strong> ${lastEntry[p] || ""}</p>`;
-  });
-
-  document.getElementById("lastEntryBox").innerHTML = html;
-}
-
-// Save token
-document.getElementById("tokenBtn").onclick = () => {
-  const input = document.getElementById("tokenInput");
-  const token = input && input.value ? input.value.trim() : "";
-
-  if (!token) {
-    document.getElementById("status").innerText = "Token cannot be empty.";
-    return;
-  }
-
-  localStorage.setItem("githubToken", token);
-  document.getElementById("status").innerText = "Token saved.";
-  loadLastEntry();
-};
-
-// Add game locally
-function addLocalGame() {
-  const date = document.getElementById("gameDate").value;
-  if (!date) {
-    document.getElementById("status").innerText = "Please select a date.";
-    return;
-  }
-
-  const row = { Date: date };
-  players.forEach(p => {
-    const val = document.getElementById("score_" + p).value;
-    row[p] = val ? val : "";
-  });
-
-  localEntries.push(row);
-  localStorage.setItem("rummyEntries", JSON.stringify(localEntries));
-}
-
-// Commit to GitHub
-document.getElementById("saveBtn").onclick = async () => {
-  addLocalGame();
-
-  const token = localStorage.getItem("githubToken");
-  if (!token) {
-    document.getElementById("status").innerText = "No GitHub token saved.";
-    return;
-  }
-
-  document.getElementById("status").innerText = "Loading existing CSV...";
-
-  const metaRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-
-  if (!metaRes.ok) {
-    document.getElementById("status").innerText = "Failed to load CSV.";
-    return;
-  }
-
-  const meta = await metaRes.json();
-  const csvText = atob(meta.content);
-  const lines = csvText.trim().split("\n");
-  const headers = lines[0].split(",");
-
-  const existingRows = lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = cols[i]);
-    return obj;
-  });
-
-  const merged = [...existingRows, ...localEntries].map(r => ({
-    Date: normalizeDate(r.Date),
-    Christine: r.Christine || "",
-    Michael: r.Michael || "",
-    Alaura: r.Alaura || "",
-    Matthew: r.Matthew || "",
-    Kirby: r.Kirby || "",
-    Annmarie: r.Annmarie || "",
-    Tom: r.Tom || ""
-  }));
-
-  const csvLines = ["Date,Christine,Michael,Alaura,Matthew,Kirby,Annmarie,Tom"];
-  merged.forEach(r => {
-    csvLines.push([
-      r.Date,
-      r.Christine,
-      r.Michael,
-      r.Alaura,
-      r.Matthew,
-      r.Kirby,
-      r.Annmarie,
-      r.Tom
-    ].join(","));
-  });
-
-  const newCSV = csvLines.join("\n");
-  const encoded = btoa(newCSV);
-
-  const commitRes = await fetch(
-    `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Normalize dates and update Cottage Rummy Data File",
-        content: encoded,
-        sha: meta.sha
-      })
+    for (let i = 0; i < sorted.length; ) {
+      let j = i + 1;
+      while (j < sorted.length && sorted[j].score === sorted[i].score) j++;
+      sorted.slice(i, j).forEach(s => placements[s.player] = place);
+      place += (j - i);
+      i = j;
     }
-  );
 
-  if (commitRes.ok) {
-    document.getElementById("status").innerText =
-      "CSV updated. Dates normalized.";
-    localEntries = [];
-    localStorage.removeItem("rummyEntries");
-    loadLastEntry();
-  } else {
-    document.getElementById("status").innerText =
-      "Commit failed. Check token permissions.";
-  }
-};
+    results.push({
+      date: iso,
+      playersCount: participants.length,
+      placements
+    });
+  });
 
-// Clear local entries
-document.getElementById("clearBtn").onclick = () => {
-  localEntries = [];
-  localStorage.removeItem("rummyEntries");
-  document.getElementById("status").innerText = "Local entries cleared.";
-};
-
-// Load last entry on startup
-loadLastEntry();
-
-// Register service worker
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
+  results.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
+
+function getFilteredResults() {
+  const filter = document.getElementById("playerCountFilter").value;
+  if (filter === "all") return results;
+  return results.filter(r => r.playersCount == filter);
+}
+
+function calculateStats(filtered, player) {
+  let wins = 0, total = 0, sum = 0;
+
+  filtered.forEach(g => {
+    const p = g.placements[player];
+    if (p) {
+      total++;
+      sum += p;
+      if (p === 1) wins++;
+    }
+  });
+
+  return {
+    winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
+    avgPlacement: total ? (sum / total).toFixed(2) : "-"
+  };
+}
+
+function buildPlayerCharts() {
+  const grid = document.getElementById("playerGrid");
+  grid.innerHTML = "";
+
+  players.forEach(p => {
+    const box = document.createElement("div");
+    box.className = "player-chart-box";
+    box.innerHTML = `
+      <h4>${p}</h4>
+      <div id="stats_${p}"></div>
+      <canvas id="chart_${p}"></canvas>
+    `;
+    grid.appendChild(box);
+  });
+}
+
+function updatePlayerCharts(filtered) {
+  players.forEach(p => {
+    const stats = calculateStats(filtered, p);
+
+    document.getElementById("stats_" + p).innerHTML = `
+      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.winRate}% Win Rate</span>
+      <span class="badge ${darkMode ? "badge-dark" : "badge-light"}">${stats.avgPlacement} Avg Placement</span>
+    `;
+
+    const counts = {};
+    filtered.forEach(g => {
+      const place = g.placements[p];
+      if (place) counts[place] = (counts[place] || 0) + 1;
+    });
+
+    const data = [];
+    for (let i = 1; i <= 7; i++) data.push(counts[i] || 0);
+
+    const ctx = document.getElementById("chart_" + p).getContext("2d");
+
+    if (playerCharts[p]) {
+      playerCharts[p].data.datasets[0].data = data;
+      playerCharts[p].update();
+    } else {
+      playerCharts[p] = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["1st","2nd","3rd","4th","5th","6th","7th"],
+          datasets: [{
+            data,
+            backgroundColor: darkMode
+              ? "rgba(0,229,255,0.6)"
+              : "rgba(66,133,244,0.6)",
+            borderColor: darkMode
+              ? "rgba(0,229,255,1)"
+              : "rgba(66,133,244,1)",
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+  });
+}
+
+async function loadData() {
+  try {
+    const rows = await loadExcel();
+    buildResults(rows);
+
+    if (!results.length) {
+      document.getElementById("fileDate").innerText =
+        "Last Game Data Entry: No valid games found.";
+      document.getElementById("statusMsg").innerText =
+        "No valid data after date parsing.";
+      return;
+    }
+
+    const latest = results.reduce((a,b) =>
+      new Date(a.date) > new Date(b.date) ? a : b
+    ).date;
+
+    document.getElementById("fileDate").innerText =
+      "Last Game Data Entry: " + latest;
+
+    buildPlayerCharts();
+    updatePlayerCharts(getFilteredResults());
+
+    document.getElementById("statusMsg").innerText =
+      "Data loaded successfully.";
+  } catch (err) {
+    document.getElementById("statusMsg").innerText =
+      "Could not load Excel file.";
+  }
+}
+
+document.getElementById("playerCountFilter").addEventListener("change", () => {
+  updatePlayerCharts(getFilteredResults());
+});
+
+document.getElementById("darkToggle").addEventListener("click", () => {
+  darkMode = !darkMode;
+  document.body.classList.toggle("dark-mode", darkMode);
+  updatePlayerCharts(getFilteredResults());
+});
+
+document.addEventListener("DOMContentLoaded", loadData);
 </script>
 
 </body>
