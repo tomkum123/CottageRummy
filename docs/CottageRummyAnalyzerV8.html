@@ -5,6 +5,7 @@
   <title>Cottage Rummy Stats</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body {
@@ -149,28 +150,55 @@
 </div>
 
 <script>
-const CSV_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.csv";
+const EXCEL_URL = "https://tomkum123.github.io/CottageRummy/Cottage%20Rummy%20Data%20File.xlsx";
 
 const players = ["Christine","Michael","Alaura","Matthew","Kirby","Annmarie","Tom"];
 let results = [];
 let playerCharts = {};
 let darkMode = false;
 
-function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  const headers = lines[0].split(",");
+// ⭐ Load Excel instead of CSV
+async function loadExcel() {
+  const res = await fetch(EXCEL_URL);
+  const arrayBuffer = await res.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-  return lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = cols[i]);
-    return obj;
-  });
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
 }
 
-function convertToISO(dateStr) {
-  const d = new Date(dateStr);
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+// ⭐ FIXED: Excel-compatible date parser
+function convertToISO(dateVal) {
+  if (dateVal == null || dateVal === "") return null;
+
+  // 1) Excel Date object
+  if (dateVal instanceof Date) {
+    const y = dateVal.getFullYear();
+    const m = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const d = String(dateVal.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // 2) Excel serial number
+  if (typeof dateVal === "number") {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    const dt = new Date(base.getTime() + dateVal * 86400000);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(dt.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3) String formats
+  let s = String(dateVal).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const [m, d, y] = s.split("/");
+    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+
   return null;
 }
 
@@ -184,7 +212,7 @@ function buildResults(rows) {
     const scores = {};
     players.forEach(p => {
       const val = r[p];
-      if (val && !isNaN(Number(val))) scores[p] = Number(val);
+      if (val !== "" && !isNaN(Number(val))) scores[p] = Number(val);
     });
 
     const participants = Object.keys(scores);
@@ -211,6 +239,8 @@ function buildResults(rows) {
       placements
     });
   });
+
+  results.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 function getFilteredResults() {
@@ -302,13 +332,18 @@ function updatePlayerCharts(filtered) {
   });
 }
 
-async function loadCSV() {
+async function loadData() {
   try {
-    const res = await fetch(CSV_URL);
-    const text = await res.text();
-
-    const rows = parseCSV(text);
+    const rows = await loadExcel();
     buildResults(rows);
+
+    if (!results.length) {
+      document.getElementById("fileDate").innerText =
+        "Last Game Data Entry: No valid games found.";
+      document.getElementById("statusMsg").innerText =
+        "No valid data after date parsing.";
+      return;
+    }
 
     const latest = results.reduce((a,b) =>
       new Date(a.date) > new Date(b.date) ? a : b
@@ -324,7 +359,7 @@ async function loadCSV() {
       "Data loaded successfully.";
   } catch (err) {
     document.getElementById("statusMsg").innerText =
-      "Could not load CSV.";
+      "Could not load Excel file.";
   }
 }
 
@@ -338,7 +373,7 @@ document.getElementById("darkToggle").addEventListener("click", () => {
   updatePlayerCharts(getFilteredResults());
 });
 
-document.addEventListener("DOMContentLoaded", loadCSV);
+document.addEventListener("DOMContentLoaded", loadData);
 </script>
 
 </body>
