@@ -228,15 +228,19 @@ async function loadLastEntry() {
 
 // Save token
 document.getElementById("tokenBtn").onclick = () => {
-  const token = document.getElementById("tokenInput").value.trim();
+  const input = document.getElementById("tokenInput");
+  const token = input && input.value ? input.value.trim() : "";
+
   if (!token) {
     document.getElementById("status").innerText = "Token cannot be empty.";
     return;
   }
+
   localStorage.setItem("githubToken", token);
   document.getElementById("status").innerText = "Token saved.";
   loadLastEntry();
 };
+
 
 // Add game locally
 function addLocalGame() {
