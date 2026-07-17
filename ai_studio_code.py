@@ -10,19 +10,19 @@ st.set_page_config(page_title="Cottage Rummy Stats", layout="wide")
 # YOUR DIRECT GITHUB LINK
 GITHUB_URL = "https://github.com/tomkum123/CottageRummy/raw/main/docs/Cottage%20Rummy%20Data%20File.xlsx"
 
-@st.cache_data(ttl=600) # Refreshes every 10 minutes if you update GitHub
+@st.cache_data(ttl=600)
 def load_data():
     try:
-        # Download from GitHub
         response = requests.get(GITHUB_URL)
         response.raise_for_status()
-        
-        # Read Excel
         df = pd.read_excel(io.BytesIO(response.content), engine='openpyxl')
         
         players = ['Christine', 'Michael', 'Alaura', 'Matthew', 'Kirby', 'Annmarie', 'Tom']
         df = df[['Date'] + players].dropna(how='all')
+        
+        # Clean dates
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date'])
         df['Year'] = df['Date'].dt.year
         
         # Calculate Player Count
@@ -39,15 +39,25 @@ def load_data():
 df, players, ranks = load_data()
 
 if df is not None:
-    # Sidebar
-    st.sidebar.header("Dashboard Filters")
+    # --- HEADER SECTION ---
+    st.title("🃏 Cottage Rummy Analytics")
+    
+    # Calculate Last Entry Date
+    last_entry_date = df['Date'].max().strftime('%B %d, %Y')
+    st.markdown(f"**Last Data Entry:** {last_entry_date}")
+    
+    # --- TOP FILTERS (Replacing Sidebar) ---
     counts = sorted(df['Player_Count'].unique().astype(int))
-    p_count = st.sidebar.selectbox("Select Number of Players:", options=counts, index=len(counts)-1)
+    
+    # Placing the selector in a column to keep it from stretching too wide
+    col_filter, col_empty = st.columns([1, 3])
+    with col_filter:
+        p_count = st.selectbox("Select Number of Players:", options=counts, index=len(counts)-1)
 
-    f_df = df[df['Player_Count'] == p_count]
+    f_df = df[df['Player_Count'] == p_count].sort_values('Date')
     f_ranks = ranks.loc[f_df.index]
 
-    # Tabs
+    # --- TABS ---
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary", "🏆 Placements", "🚀 Advanced Analytics", "📋 Raw Data"])
 
     # --- TAB 1: SUMMARY ---
@@ -73,15 +83,15 @@ if df is not None:
         l1, l2, l3 = st.columns(3)
         with l1:
             st.markdown("**Total Wins (1st Place Finish)**")
-            st.caption("This counts the individual games where a player achieved the absolute lowest score at the table.")
+            st.caption("Counts individual games where a player achieved the lowest score at the table.")
         with l2:
             st.markdown("**Average Score**")
-            st.caption("The sum of all points divided by games played. A lower number represents a more skilled player.")
+            st.caption("Sum of all points divided by games. Lower is better.")
         with l3:
             st.markdown("**Color Coding**")
             st.caption("Green = Top performance. Red = High-point finishes.")
 
-    # --- TAB 2: PLACEMENT ANALYSIS (Card Style) ---
+    # --- TAB 2: PLACEMENT ANALYSIS ---
     with tab2:
         st.subheader(f"Placement Breakdown ({p_count} Player Games)")
         cols = st.columns(3)
@@ -115,7 +125,7 @@ if df is not None:
             st.plotly_chart(fig_clobber, use_container_width=True)
         with r1_2:
             stdev = f_df[players].std().dropna().sort_values()
-            fig_stdev = px.bar(stdev, title="Stability Rating (Lower = More Consistent)", color=stdev.values, color_continuous_scale="Purples", text_auto='.1f')
+            fig_stdev = px.bar(stdev, title="Stability Rating (Lower = Consistent)", color=stdev.values, color_continuous_scale="Purples", text_auto='.1f')
             fig_stdev.update_traces(textposition='inside')
             st.plotly_chart(fig_stdev, use_container_width=True)
 
